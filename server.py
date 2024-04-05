@@ -146,7 +146,7 @@ def get_suggests(user_id):
 
 @app.route('/')
 def index():
-    return'<H1> Сервер в работе </H1>'
+    return'<H1> Сервер в работе уже час </H1>'
 
 
 if __name__ == '__main__':
