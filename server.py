@@ -122,6 +122,24 @@ def get_suggests(user_id):
             "url": "https://market.yandex.ru/search?text=слон",
             "hide": True
         })
+    elif len(suggests) < 2:
+        suggests.append({
+            "title": "Куплю",
+            "url": "https://market.yandex.ru/search?text=слон",
+            "hide": True
+        })
+    elif len(suggests) < 2:
+        suggests.append({
+            "title": "Покупаю",
+            "url": "https://market.yandex.ru/search?text=слон",
+            "hide": True
+        })
+    elif len(suggests) < 2:
+        suggests.append({
+            "title": "Хорошо",
+            "url": "https://market.yandex.ru/search?text=слон",
+            "hide": True
+        })
 
     return suggests
 
