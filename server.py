@@ -122,19 +122,19 @@ def get_suggests(user_id):
             "url": "https://market.yandex.ru/search?text=слон",
             "hide": True
         })
-    elif len(suggests) < 2:
+    if len(suggests) < 2:
         suggests.append({
             "title": "Куплю",
             "url": "https://market.yandex.ru/search?text=слон",
             "hide": True
         })
-    elif len(suggests) < 2:
+    if len(suggests) < 2:
         suggests.append({
             "title": "Покупаю",
             "url": "https://market.yandex.ru/search?text=слон",
             "hide": True
         })
-    elif len(suggests) < 2:
+    if len(suggests) < 2:
         suggests.append({
             "title": "Хорошо",
             "url": "https://market.yandex.ru/search?text=слон",
@@ -146,7 +146,7 @@ def get_suggests(user_id):
 
 @app.route('/')
 def index():
-    return'<H1> Сервер в работе уже час </H1>'
+    return'<H1> Сервер в работе </H1>'
 
 
 if __name__ == '__main__':
