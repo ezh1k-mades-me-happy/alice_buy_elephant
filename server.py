@@ -25,6 +25,8 @@ logging.basicConfig(level=logging.INFO)
 # то мы уберем одну подсказку. Как будто что-то меняется :)
 sessionStorage = {}
 
+goods = ['слон', 'кролик']
+
 
 @app.route('/post', methods=['POST'])
 # Функция получает тело запроса и возвращает ответ.
@@ -67,12 +69,13 @@ def handle_dialog(req, res):
                 "Не хочу.",
                 "Не буду.",
                 "Отстань!",
-            ]
+            ],
+            'animal': 0
         }
         # Заполняем текст ответа
-        res['response']['text'] = 'Привет! Купи слона!'
+        res['response']['text'] = 'Привет! Купи слона! ' + goods[sessionStorage[user_id]['animal']] + 'a!'
         # Получим подсказки
-        res['response']['buttons'] = get_suggests(user_id)
+        res['response']['buttons'] = get_suggests(user_id, goods[sessionStorage[user_id]['animal']])
         return
 
     # Сюда дойдем только, если пользователь не новый,
@@ -90,18 +93,25 @@ def handle_dialog(req, res):
         'хорошо'
     ]:
         # Пользователь согласился, прощаемся.
-        res['response']['text'] = 'Слона можно найти на Яндекс.Маркете!'
-        res['response']['end_session'] = True
+        if sessionStorage[user_id]['animal'] == len(goods) - 1:
+            res['response']['text'] = f'{goods[sessionStorage[user_id]["animal"]].capitalize()}a можно найти на Яндекс.Маркете!'
+            sessionStorage[user_id]['animal'] += 1
+            res['response']['end_session'] = True
+        else:
+            res['response']['text'] = f'{goods[sessionStorage[user_id]["animal"]].capitalize()}a можно найти на Яндекс.Маркете!'
+            sessionStorage[user_id]['animal'] += 1
+            res['response']['text'] += 'A ' + goods[sessionStorage[user_id]["animal"]] + 'a купишь?'
+            res['response']['buttons'] = get_suggests(user_id, goods[sessionStorage[user_id]['animal']])
         return
 
     # Если нет, то убеждаем его купить слона!
     res['response']['text'] = \
         f"Все говорят '{req['request']['original_utterance']}', а ты купи слона!"
-    res['response']['buttons'] = get_suggests(user_id)
+    res['response']['buttons'] = get_suggests(user_id, goods[sessionStorage[user_id]['animal']])
 
 
 # Функция возвращает две подсказки для ответа.
-def get_suggests(user_id):
+def get_suggests(user_id, goods):
     session = sessionStorage[user_id]
 
     # Выбираем две первые подсказки из массива.
@@ -119,24 +129,12 @@ def get_suggests(user_id):
     if len(suggests) < 2:
         suggests.append({
             "title": "Ладно",
-            "url": "https://market.yandex.ru/search?text=слон",
+            "url": f"https://market.yandex.ru/search?text={goods}",
             "hide": True
         })
     if len(suggests) < 2:
         suggests.append({
             "title": "Куплю",
-            "url": "https://market.yandex.ru/search?text=слон",
-            "hide": True
-        })
-    if len(suggests) < 2:
-        suggests.append({
-            "title": "Покупаю",
-            "url": "https://market.yandex.ru/search?text=слон",
-            "hide": True
-        })
-    if len(suggests) < 2:
-        suggests.append({
-            "title": "Хорошо",
             "url": "https://market.yandex.ru/search?text=слон",
             "hide": True
         })
