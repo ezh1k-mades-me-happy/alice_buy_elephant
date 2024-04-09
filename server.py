@@ -1,32 +1,79 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request
 import logging
 import json
-import random
+import requests
+from math import sin, cos, sqrt, atan2, radians
+
+
+def get_geo_info(city, type_info='country'):
+    if type_info == 'country':
+        return get_country(city)
+    return get_coordinates(city)
+
+
+def get_coordinates(city):
+    url = "https://geocode-maps.yandex.ru/1.x/"
+
+    params = {
+        'geocode': city,
+        'format': 'json',
+        'apikey': "40d1649f-0493-4b70-98ba-98533de7710b"
+    }
+
+    response = requests.get(url, params)
+    json = response.json()
+    point_str = json['response']['GeoObjectCollection']['featureMember'][0]['GeoObject']['Point']['pos']
+    point_array = [float(x) for x in point_str.split(' ')]
+
+    return point_array
+
+
+def get_country(city):
+    url = "https://geocode-maps.yandex.ru/1.x/"
+
+    params = {
+        'geocode': city,
+        'format': 'json',
+        'apikey': "40d1649f-0493-4b70-98ba-98533de7710b"
+    }
+
+    response = requests.get(url, params)
+    json = response.json()
+
+    return \
+        json['response']['GeoObjectCollection']['featureMember'][0]['GeoObject']['metaDataProperty'][
+            'GeocoderMetaData'][
+            'AddressDetails']['Country']['CountryName']
+
+
+def get_distance(p1, p2):
+    R = 6373.0
+
+    lon1 = radians(p1[0])
+    lat1 = radians(p1[1])
+    lon2 = radians(p2[0])
+    lat2 = radians(p2[1])
+
+    dlon = lon2 - lon1
+    dlat = lat2 - lat1
+
+    a = sin(dlat / 2) ** 2 + cos(lat1) * cos(lat2) * sin(dlon / 2) ** 2
+    c = 2 * atan2(sqrt(a), sqrt(1 - a))
+
+    distance = R * c
+
+    return distance
+
 
 app = Flask(__name__)
 
-logging.basicConfig(level=logging.INFO)
-
-# создаем словарь, в котором ключ — название города,
-# а значение — массив, где перечислены id картинок,
-# которые мы записали в прошлом пункте.
-
-cities = {
-    'москва': ['1521359/ae85e40bebe84e8be847',
-               '1521359/9bd38cf9210e0bbec4fb'],
-    'нью-йорк': ['1540737/1bd4f9682e42423355c5'],
-    'париж': ["997614/3f41bd395ed8e4035fe3",
-              '997614/fb5f7bd94b4fa5c5f6cf']
-}
-
-# создаем словарь, где для каждого пользователя
-# мы будем хранить его имя
-sessionStorage = {}
-
+logging.basicConfig(level=logging.INFO, filename='app.log', format='%(asctime)s %(levelname)s %(name)s %(message)s')
 
 @app.route('/post', methods=['POST'])
 def main():
-    logging.info(f'Request: {request.json!r}')
+
+    logging.info('Request: %r', request.json)
+
     response = {
         'session': request.json['session'],
         'version': request.json['version'],
@@ -34,93 +81,56 @@ def main():
             'end_session': False
         }
     }
+
     handle_dialog(response, request.json)
-    logging.info(f'Response: {response!r}')
-    return jsonify(response)
+
+    logging.info('Request: %r', response)
+
+    return json.dumps(response)
 
 
 def handle_dialog(res, req):
+
     user_id = req['session']['user_id']
 
-    # если пользователь новый, то просим его представиться.
     if req['session']['new']:
-        res['response']['text'] = 'Привет! Назови свое имя!'
-        # создаем словарь в который в будущем положим имя пользователя
-        sessionStorage[user_id] = {
-            'first_name': None
-        }
+
+        res['response']['text'] = 'РџСЂРёРІРµС‚! РЇ РјРѕРіСѓ СЃРєР°Р·Р°С‚СЊ РІ РєР°РєРѕР№ СЃС‚СЂР°РЅРµ РіРѕСЂРѕРґ РёР»Рё СЃРєР°Р·Р°С‚СЊ СЂР°СЃСЃС‚РѕСЏРЅРёРµ РјРµР¶РґСѓ РіРѕСЂРѕРґР°РјРё!'
+
         return
 
-    # если пользователь не новый, то попадаем сюда.
-    # если поле имени пустое, то это говорит о том,
-    # что пользователь еще не представился.
-    if sessionStorage[user_id]['first_name'] is None:
-        # в последнем его сообщение ищем имя.
-        first_name = get_first_name(req)
-        # если не нашли, то сообщаем пользователю что не расслышали.
-        if first_name is None:
-            res['response']['text'] = \
-                'Не расслышала имя. Повтори, пожалуйста!'
-        # если нашли, то приветствуем пользователя.
-        # И спрашиваем какой город он хочет увидеть.
-        else:
-            sessionStorage[user_id]['first_name'] = first_name
-            res['response'][
-                'text'] = 'Приятно познакомиться, ' \
-                          + first_name.title() \
-                          + '. Я - Алиса. Какой город хочешь увидеть?'
-            # получаем варианты buttons из ключей нашего словаря cities
-            res['response']['buttons'] = [
-                {
-                    'title': city.title(),
-                    'hide': True
-                } for city in cities
-            ]
-    # если мы знакомы с пользователем и он нам что-то написал,
-    # то это говорит о том, что он уже говорит о городе,
-    # что хочет увидеть.
+    cities = get_cities(req)
+
+    if len(cities) == 0:
+
+        res['response']['text'] = 'РўС‹ РЅРµ РЅР°РїРёСЃР°Р» РЅР°Р·РІР°РЅРёРµ РЅРµ РѕРґРЅРѕРіРѕ РіРѕСЂРѕРґР°!'
+
+    elif len(cities) == 1:
+
+        res['response']['text'] = 'РС‚РѕС‚ РіРѕСЂРѕРґ РІ СЃС‚СЂР°РЅРµ - ' + get_country(cities[0])
+
+    elif len(cities) == 2:
+
+        distance = get_distance((get_geo_info(cities[0]), 'coordinates'), (get_geo_info(cities[1]), 'coordinates'))
+        res['response']['text'] = 'Р Р°СЃСЃС‚РѕСЏРЅРёРµ РјРµР¶РґСѓ СЌС‚РёРјРё РіРѕСЂРѕРґР°РјРё: ' + str(round(distance)) + ' РєРј.'
+
     else:
-        # ищем город в сообщение от пользователя
-        city = get_city(req)
-        # если этот город среди известных нам,
-        # то показываем его (выбираем одну из двух картинок случайно)
-        if city in cities:
-            res['response']['card'] = {}
-            res['response']['card']['type'] = 'BigImage'
-            res['response']['card']['title'] = 'Этот город я знаю.'
-            res['response']['card']['image_id'] = random.choice(cities[city])
-            res['response']['text'] = 'Я угадал!'
-        # если не нашел, то отвечает пользователю
-        # 'Первый раз слышу об этом городе.'
-        else:
-            res['response']['text'] = \
-                'Первый раз слышу об этом городе. Попробуй еще разок!'
+
+        res['response']['text'] = 'РЎР»РёС€РєРѕРј РјРЅРѕРіРѕ РіРѕСЂРѕРґРѕРІ!'
 
 
-def get_city(req):
-    # перебираем именованные сущности
+def get_cities(req):
+
+    cities = []
+
     for entity in req['request']['nlu']['entities']:
-        # если тип YANDEX.GEO - то пытаемся получить город(city),
-        # если нет, то возвращаем None
+
         if entity['type'] == 'YANDEX.GEO':
-            # возвращаем None, если не нашли сущности с типом YANDEX.GEO
-            return entity['value'].get('city', None)
 
+            if 'city' in entity['value'].keys():
+                cities.append(entity['value']['city'])
 
-def get_first_name(req):
-    # перебираем сущности
-    for entity in req['request']['nlu']['entities']:
-        # находим сущность с типом 'YANDEX.FIO'
-        if entity['type'] == 'YANDEX.FIO':
-            # Если есть сущность с ключом 'first_name',
-            # то возвращаем ее значение.
-            # Во всех остальных случаях возвращаем None.
-            return entity['value'].get('first_name', None)
-
-
-@app.route('/')
-def index():
-    return 'Page under construction'
+    return cities
 
 
 if __name__ == '__main__':
